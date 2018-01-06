@@ -73,7 +73,7 @@ fid==2 {
     arp_flags = $3
     arp_mac   = $4
     arp_dev   = $6
-    if(arp_flags != "0x0" && !(arp_ip in ip) && arp_dev !="eth1"){
+    if(arp_flags != "0x0" && !(arp_ip in ip) && arp_dev == "br-lan"){
 	if(debug)
 	    print "new host:", arp_ip, arp_flags > "/dev/stderr"
 	hosts[arp_ip] = ""

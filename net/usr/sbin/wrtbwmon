@@ -18,6 +18,7 @@ networkFuncs=/lib/functions/network.sh
 uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
+wrtbwmonflag="/tmp/wrtbwmon.flag"
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -252,6 +253,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 	;;
     
     "setup" )
+	echo "1" > $wrtbwmonflag
 	checkDbArg
 	[ -w "$DB" ] && echo "Warning: using existing $DB"
 	createDbIfMissing
@@ -280,7 +282,7 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> $3.tmp
 
     "remove" )
 	iptables-save | grep -v RRDIPT | iptables-restore
-	rm -rf "$lockDir"
+	rm -rf "$lockDir" $wrtbwmonflag
 	;;
 
     *)
@@ -299,3 +301,4 @@ Note: [user_file] is an optional file to match users with MAC addresses.
        Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
 	;;
 esac
+
