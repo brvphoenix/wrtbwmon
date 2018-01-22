@@ -188,10 +188,6 @@ END {
     for(ii in arp_ip){
         lb=arp_mac[ii]
 
-         mac[lb]        =  arp_mac[ii]
-         ip[lb]         =  arp_ip[ii]
-         inter[lb]      =  arp_inter[ii]
-
         if(lb in mac){
             if(arp_lastDate[ii] != ""){
                 bw[lb "/in"]   +=  arp_bw[ii "/in"]
@@ -204,6 +200,9 @@ END {
             bw[lb "/out"]  =  arp_bw[ii "/out"]
             firstDate[lb]  =  lastDate[lb] = arp_firstDate[ii]
         }
+        mac[lb]        =  arp_mac[ii]
+        ip[lb]         =  arp_ip[ii]
+        inter[lb]      =  arp_inter[ii]
     }
 
     for(i in mac)
