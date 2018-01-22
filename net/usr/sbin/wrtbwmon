@@ -3,13 +3,16 @@
 
 case $1 in
     "setup" )
-        if [ -e /var/run/wrtbwmon.pid -o -n $( pidof wrtbwmon ) ]; then
+        if [ -e '/var/run/wrtbwmon.pid' ]
+        then
             echo "Another wrtbwmon is on running!!!"
         else
 	    echo $$ > /var/run/wrtbwmon.pid
             i=0
             while [ $i -le 1 ];do
-                wrtbwmon1 setup $2
+                if [ -z "$(iptables-save | grep RRDIPT)" ]; then
+                    wrtbwmon1 setup $2
+                fi
                 wrtbwmon1 update $2
                 wrtbwmon1 publish $2 $3 $4
                 sleep 1
@@ -20,11 +23,11 @@ case $1 in
     "remove" )
         wrtbwmon1 remove
         if [ -e /var/run/wrtbwmon.pid ]; then
-            kill $( awk NR==1 /var/run/wrtbwmon.pid ) >> /dev/null 2>&1
+            kill $( cat /var/run/wrtbwmon.pid ) >> /dev/null 2>&1
             rm -f /var/run/wrtbwmon.pid
         fi
 
-        if [ -n $( pidof wrtbwmon ) ]; then
+        if [ -n "$( pidof wrtbwmon )" ]; then
             for pw in $( pidof wrtbwmon )
             do
                 kill pw >> /dev/null 2>&1

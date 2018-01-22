@@ -193,7 +193,6 @@ update()
     done
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
-    cp /tmp/iptables_$$.tmp /tmp/t.txt
     awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
