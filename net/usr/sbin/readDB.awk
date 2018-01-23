@@ -38,7 +38,7 @@ function date(    cmd, d){
 }
 
 function DateToStr(str){
-    return("str |sed 's/[: _]/-/g' | awk -F "-" '{print $3 $2 $1 $4 $5 $6}'")
+    return(str " | sed 's/[\: \/]/-/g' | awk -F- " " '{print $1 $2 $3 $4 $5 $6}'")
 }
 
 BEGIN {
@@ -59,7 +59,7 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 
     lb=$1
 
-    if(NR==1){
+    if(!(lb in mac)){
         mac[lb]        =  $1
         ip[lb]         =  $2
         inter[lb]      =  $3
@@ -69,26 +69,15 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
         lastDate[lb]   =  $8 
     }
     else{
-        if(!(lb in mac)){
-            mac[lb]        =  $1
+        if(DateToStr($7)<DateToStr(firstDate[lb]))
+            firstDate[lb]  =  $7
+        if(DateToStr($8)>DateToStr(lastDate[lb])){
             ip[lb]         =  $2
             inter[lb]      =  $3
-            bw[lb "/in"]   =  $4
-            bw[lb "/out"]  =  $5
-            firstDate[lb]  =  $7
-            lastDate[lb]   =  $8 
+            lastDate[lb]   =  $8
         }
-        else{
-            if(DateToStr($7)<DateToStr(firstDate[lb]))
-                firstDate[lb]  =  $7
-            if(DateToStr($8)>DateToStr(lastDate[lb])){
-                ip[lb]         =  $2
-                inter[lb]      =  $3
-                lastDate[lb]   =  $8
-            }
-            bw[lb "/in"]   =  bw[lb "/in"] + $4
-            bw[lb "/out"]  =  bw[lb "/out"] + $5
-        }
+        bw[lb "/in"]   =  bw[lb "/in"] + $4
+        bw[lb "/out"]  =  bw[lb "/out"] + $5
     }
     next
 }
