@@ -15,10 +15,20 @@ case $1 in
                 fi
                 wrtbwmon1 update $2
                 wrtbwmon1 publish $2 $3 $4
-                sleep 1
+                sleep 10
             done
         fi
 	;;
+
+    "publish" )
+        if [ -z "$(iptables-save | grep RRDIPT)" ]; then
+            wrtbwmon1 setup $2
+        fi
+        wrtbwmon1 update $2
+        wrtbwmon1 publish $2 $3 $4
+
+	;;
+
 
     "remove" )
         wrtbwmon1 remove
