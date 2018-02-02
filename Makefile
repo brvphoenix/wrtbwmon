@@ -40,6 +40,7 @@ define Package/wrtbwmon/install
 	$(INSTALL_DIR) $(1)/usr/sbin
 	$(INSTALL_BIN) ./net/usr/sbin/readDB.awk $(1)/usr/sbin/readDB.awk
 	$(INSTALL_BIN) ./net/usr/sbin/wrtbwmon $(1)/usr/sbin/wrtbwmon
+	$(INSTALL_BIN) ./net/usr/sbin/wrtbwmon1 $(1)/usr/sbin/wrtbwmon1
 	
 	$(INSTALL_DIR) $(1)/usr/share/wrtbwmon
 	$(INSTALL_BIN) ./net/usr/share/wrtbwmon/usage.htm1 $(1)/usr/share/wrtbwmon/usage.htm1

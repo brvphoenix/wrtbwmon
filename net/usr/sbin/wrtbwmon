@@ -3,7 +3,7 @@
 
 case $1 in
     "setup" )
-        if [ -e '/var/run/wrtbwmon.pid' ]
+        if [ -e /var/run/wrtbwmon.pid ]
         then
             echo "Another wrtbwmon is on running!!!"
         else
@@ -32,17 +32,12 @@ case $1 in
 
     "remove" )
         wrtbwmon1 remove
-        if [ -e /var/run/wrtbwmon.pid ]; then
-            kill $( cat /var/run/wrtbwmon.pid ) >> /dev/null 2>&1
-            rm -f /var/run/wrtbwmon.pid
+        if [ -e '/var/run/wrtbwmon.pid' ]; then
+            kill -9 $( cat /var/run/wrtbwmon.pid ) >> /dev/null 2>&1
         fi
 
-        if [ -n "$( pidof wrtbwmon )" ]; then
-            for pw in $( pidof wrtbwmon )
-            do
-                kill pw >> /dev/null 2>&1
-            done
-        fi
+
+        rm -f /var/run/wrtbwmon.pid >> /dev/null 2>&1
 	;;
 
     *)
