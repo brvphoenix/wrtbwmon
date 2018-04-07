@@ -93,7 +93,7 @@ FNR==1 {
 fid==2 {
     #!@todo regex match IPs and MACs for sanity
     lb=$1
-    if($6 == "br-lan" && $3 != "0x0"){
+    if($6 != wanIF && $3 != "0x0" && lb ~ "^" ipReg){
         hosts[lb]      = ""
         arp_mac[lb]   = $4
         arp_ip[lb]    = $1
@@ -189,7 +189,6 @@ END {
             bw[lb "/out"]  =  arp_bw[ii "/out"]
             firstDate[lb]  =  lastDate[lb] = arp_firstDate[ii]
         }
-        mac[lb]        =  arp_mac[ii]
         ip[lb]         =  arp_ip[ii]
         inter[lb]      =  arp_inter[ii]
     }

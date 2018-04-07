@@ -13,19 +13,26 @@ case $1 in
                 if [ -z "$(iptables-save | grep RRDIPT)" ]; then
                     wrtbwmon1 setup $2
                 fi
-                wrtbwmon1 update $2
-                wrtbwmon1 publish $2 $3 $4
+
+                pidnum=$( ps | grep wrtbwmon | wc -l )
+                if [ $pidnum -le 3 ];then
+                    wrtbwmon1 update $2
+                fi
                 sleep 10
             done
         fi
+
 	;;
 
     "publish" )
         if [ -z "$(iptables-save | grep RRDIPT)" ]; then
             wrtbwmon1 setup $2
         fi
-        wrtbwmon1 update $2
-        wrtbwmon1 publish $2 $3 $4
+
+        if [ $( ps | grep wrtbwmon | wc -l ) -le 7 ];then
+            wrtbwmon1 update $2 $4
+        fi
+
 
 	;;
 

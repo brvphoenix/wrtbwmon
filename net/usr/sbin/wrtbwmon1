@@ -18,6 +18,8 @@ networkFuncs=/lib/functions/network.sh
 uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
+ipReg=`echo $( echo $( uci get network.lan.ipaddr ) | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+' )`
+wanIF=`echo $( uci get network.wan.ifname )`
 
 chains='INPUT OUTPUT FORWARD'
 DEBUG=
@@ -193,7 +195,7 @@ update()
     done
     # the iptables and readDB commands have to be separate. Otherwise,
     # they will fight over iptables locks
-    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -f $binDir/readDB.awk \
+    awk -v mode="$mode" -v interfaces=\""$interfaces"\" -v ipReg="$ipReg" -v wanIF="$wanIF" -f $binDir/readDB.awk \
 	$DB \
 	/proc/net/arp \
 	/tmp/iptables_$$.tmp
@@ -299,4 +301,3 @@ Note: [user_file] is an optional file to match users with MAC addresses.
        Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
 	;;
 esac
-
