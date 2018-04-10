@@ -9,18 +9,18 @@ function newRule(arp_ip,
     # checking for existing rules shouldn't be necessary if newRule is
     # always called after db is read, arp table is read, and existing
     # iptables rules are read.
-    ipt_cmd="iptables -t mangle -j RETURN -s " arp_ip
+    ipt_cmd="ip6tables -t mangle -j RETURN -s " arp_ip
     system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
-    ipt_cmd="iptables -t mangle -j RETURN -d " arp_ip
+    ipt_cmd="ip6tables -t mangle -j RETURN -d " arp_ip
     system(ipt_cmd " -C RRDIPT_FORWARD 2>/dev/null || " ipt_cmd " -A RRDIPT_FORWARD")
 }
 
 function delRule(arp_ip,
     ipt_cmd){
 
-    ipt_cmd="iptables -t mangle -D RRDIPT_FORWARD -s " arp_ip
+    ipt_cmd="ip6tables -t mangle -D RRDIPT_FORWARD -s " arp_ip
     system(ipt_cmd " -j RETURN 2>/dev/null")
-    ipt_cmd="iptables -t mangle -D RRDIPT_FORWARD -d " arp_ip
+    ipt_cmd="ip6tables -t mangle -D RRDIPT_FORWARD -d " arp_ip
     system(ipt_cmd " -j RETURN 2>/dev/null")
 }
 
@@ -92,11 +92,11 @@ FNR==1 {
 fid==2 {
     #!@todo regex match IPs and MACs for sanity
     lb=$1
-    if($6 != wanIF && $3 != "0x0" && lb ~ "^" ipReg){
+    if($6 != wanIF && lb ~ "^" ipReg && $4!="FAILED" && $4!="INCOMPLETE"){
         hosts[lb]      = ""
-        arp_mac[lb]   = $4
+        arp_mac[lb]   = $5
         arp_ip[lb]    = $1
-        arp_inter[lb] = $6
+        arp_inter[lb] = $3
         arp_bw[lb "/in"]   =  0
         arp_bw[lb "/out"]  =  0
         arp_firstDate[lb]  =  date()
@@ -119,20 +119,20 @@ fid==3 && $1 == "Chain"{
     next
 }
 
-fid==3 && rrd && (NF < 9 || $1=="pkts"){ next }
+fid==3 && rrd && (NF < 8 || $1=="pkts"){ next }
 
 fid==3 && rrd { # iptables input
-    if($6 != "*"){
+    if($5 != "*"){
+        m=$5
+        n=m "/out"
+    } else if($6 != "*"){
         m=$6
         n=m "/in"
-    } else if($7 != "*"){
+    } else if($7 != "::/0"){
         m=$7
         n=m "/out"
-    } else if($8 != "0.0.0.0/0"){
+    } else { # $8 != "::/0"
         m=$8
-        n=m "/out"
-    } else { # $9 != "0.0.0.0/0"
-        m=$9
         n=m "/in"
     }
 

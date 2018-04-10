@@ -15,9 +15,9 @@ START=91
 
 start(){
     local dbpath=$( uci get wrtbwmon.general.path )
-    /usr/sbin/wrtbwmon setup $dbpath /tmp/usage.htm /etc/wrtbwmon.user >> /dev/null 2>&1 &
+    /usr/sbin/wrtbwmon -46 -f $dbpath -p /tmp/usage.htm -u /etc/wrtbwmon.user -b >> /dev/null 2>&1 &
 }
 
 stop(){
-    /usr/sbin/wrtbwmon remove
+    /usr/sbin/wrtbwmon -k
 }
