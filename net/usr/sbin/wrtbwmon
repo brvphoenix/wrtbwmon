@@ -162,7 +162,6 @@ newChain()
 	    [ -n "$DEBUG" ] && echo "DEBUG: $ipt chain misplaced, recreating it..."
 	    $ipt -t mangle -I $chain -j RRDIPT_$chain
     fi
-    exit 0
 )
 
 # chain tun
@@ -171,18 +170,15 @@ newRuleIF()
     chain=$1
     IF=$2
     ipt=$3
-    
-    for i in $IPT ; do
-        #!@todo test
-        if [ "$chain" = "OUTPUT" ]; then
-	        cmd="$ipt -t mangle -o $IF -j RETURN"
-	        eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
-        elif [ "$chain" = "INPUT" ]; then
-	        cmd="$ipt -t mangle -i $IF -j RETURN"
-	        eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
-        fi
-    done
-    exit 0
+
+    #!@todo test
+    if [ "$chain" = "OUTPUT" ]; then
+	    cmd="$ipt -t mangle -o $IF -j RETURN"
+	    eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+    elif [ "$chain" = "INPUT" ]; then
+	    cmd="$ipt -t mangle -i $IF -j RETURN"
+	    eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
+    fi
 )
 
 update()
