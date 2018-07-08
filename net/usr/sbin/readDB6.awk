@@ -171,11 +171,6 @@ fid==3 && rrd { # iptables input
 }
 
 END {
-    if(mode=="noUpdate") exit
-    close(dbFile)
-    system("rm -f " dbFile)
-    print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
-    OFS=","
 
     for(ii in arp_ip){
         lb=arp_mac[ii]
@@ -196,6 +191,11 @@ END {
         ip[lb]         =  arp_ip[ii]
         inter[lb]      =  arp_inter[ii]
     }
+
+    if(mode=="noUpdate") exit
+    if (close(dbFile)) exit
+    print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
+    OFS=","
 
     for(i in mac)
     #if(total(i)>0)
