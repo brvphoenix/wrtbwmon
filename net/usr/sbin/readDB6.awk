@@ -92,7 +92,7 @@ FNR==1 {
 fid==2 {
     #!@todo regex match IPs and MACs for sanity
     lb=$1
-    if($6 != wanIF && lb ~ "^" ipReg && $4!="FAILED" && $4!="INCOMPLETE"){
+    if($3 != wanIF && lb ~ "^" ipReg && $4!="FAILED" && $4!="INCOMPLETE"){
         hosts[lb]      = ""
         arp_mac[lb]   = $5
         arp_ip[lb]    = $1
