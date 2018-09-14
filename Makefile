@@ -38,13 +38,10 @@ endef
 
 define Package/wrtbwmon/install
 	$(INSTALL_DIR) $(1)/usr/sbin
-	$(INSTALL_BIN) ./net/usr/sbin/readDB.awk $(1)/usr/sbin/readDB.awk
-	$(INSTALL_BIN) ./net/usr/sbin/wrtbwmon $(1)/usr/sbin/wrtbwmon
-	$(INSTALL_BIN) ./net/usr/sbin/wrtbwmon1 $(1)/usr/sbin/wrtbwmon1
+	$(INSTALL_BIN) ./net/usr/sbin/* $(1)/usr/sbin/
 	
 	$(INSTALL_DIR) $(1)/usr/share/wrtbwmon
-	$(INSTALL_BIN) ./net/usr/share/wrtbwmon/usage.htm1 $(1)/usr/share/wrtbwmon/usage.htm1
-	$(INSTALL_BIN) ./net/usr/share/wrtbwmon/usage.htm2 $(1)/usr/share/wrtbwmon/usage.htm2
+	$(INSTALL_BIN) ./net/usr/share/wrtbwmon/* $(1)/usr/share/wrtbwmon/
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./net/etc/init.d/wrtbwmon $(1)/etc/init.d/wrtbwmon
