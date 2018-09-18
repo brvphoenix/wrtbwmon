@@ -172,6 +172,8 @@ fid==3 && rrd { # iptables input
 
 END {
 
+    if(mode=="noUpdate") exit
+
     for(ii in arp_ip){
         lb=arp_mac[ii]
 
@@ -192,13 +194,11 @@ END {
         inter[lb]      =  arp_inter[ii]
     }
 
-    if(mode=="noUpdate") exit
-    if (close(dbFile)) exit
+    close(dbFile)
     print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
     OFS=","
 
     for(i in mac)
-    #if(total(i)>0)
         print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
     close(dbFile)
     # for hosts without rules
