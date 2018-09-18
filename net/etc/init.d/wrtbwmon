@@ -11,7 +11,7 @@
 # Short-Description:  iptables-based bandwidth monitor
 ### END INIT INFO
 
-START=91
+START=99
 
 start(){
     local dbpath=$( uci get wrtbwmon.general.path )

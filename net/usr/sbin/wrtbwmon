@@ -234,9 +234,9 @@ update()
     )
 
     [ -f /tmp/ip6tables_$$.tmp ] && (
-        echo "This file is geneated by '/usr/bin/ip -6 neigh'" >/tmp/ip6addr_$$.tmp
-        `/usr/bin/ip -6 neigh >>/tmp/ip6addr_$$.tmp`;
-        ipReg=`/usr/bin/ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
+        echo "This file is geneated by 'ip -6 neigh'" >/tmp/ip6addr_$$.tmp
+        `ip -6 neigh >>/tmp/ip6addr_$$.tmp`;
+        ipReg=`ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
 
         awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" -f $binDir/readDB6.awk \
         "${DB}6" \
