@@ -124,10 +124,10 @@ fid==3 && rrd && (NF < 8 || $1=="pkts"){ next }
 fid==3 && rrd { # iptables input
     if($5 != "*"){
         m=$5
-        n=m "/out"
+        n=m "/in"
     } else if($6 != "*"){
         m=$6
-        n=m "/in"
+        n=m "/out"
     } else if($7 != "::/0"){
         m=$7
         n=m "/out"

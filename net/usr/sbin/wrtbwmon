@@ -149,7 +149,7 @@ unlock()
 
 # chain
 newChain()
-(
+{
     chain=$1
     ipt=$2
     # Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
@@ -162,11 +162,11 @@ newChain()
         [ -n "$DEBUG" ] && echo "DEBUG: $ipt chain misplaced, recreating it..."
         $ipt -t mangle -I $chain -j RRDIPT_$chain
     fi
-)
+}
 
 # chain tun
 newRuleIF()
-(
+{
     chain=$1
     IF=$2
     ipt=$3
@@ -179,7 +179,7 @@ newRuleIF()
         cmd="$ipt -t mangle -i $IF -j RETURN"
         eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
     fi
-)
+}
 
 update()
 {
