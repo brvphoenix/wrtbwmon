@@ -389,7 +389,7 @@ if "$batchMod" ;then
 			if [ -e /var/log/wrtbwmon.log ]; then
 				timeOld=$(awk -F, '{print $1+$2}' /var/log/wrtbwmon.log)
 				xTime=$(awk -v c1=$timeNow -v c2=$timeOld 'BEGIN{print c1-c2}')
-				if [ $xTime > 0.2 ];then
+				if [ $xTime \> 0.5 ];then
 					echo $timeNow',30' >/var/log/wrtbwmon.log
 					upflag=1
 				else
