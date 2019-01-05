@@ -1,23 +1,26 @@
 #!/bin/sh
 #
 
-trap "rm -f /tmp/*_$$.tmp; kill $$" INT
-trap "rm -f /tmp/*_$$.tmp; kill $$" 9
+# Default parameters for wrtbwmon.
+runMode=0
+Monitor46=4
+updatePID=
+
+# Default parameters for readDB.awk.
+mode=
+DEBUG=
+
+# Constant parameter for wrtbwmon.
 binDir=/usr/sbin
 dataDir=/usr/share/wrtbwmon
-lockDir=/tmp/wrtbwmon.lock
-pidFile=$lockDir/pid
+
 networkFuncs=/lib/functions/network.sh
 uci=`which uci 2>/dev/null`
 nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
-batchMod=false
-Monitor46=4
 
 chains='INPUT OUTPUT FORWARD'
-DEBUG=
 interfaces='eth0 tun0' # in addition to detected WAN
-mode=
 
 # DNS server for reverse lookups provided in "DNS".
 # don't perform reverse DNS lookups by default
@@ -28,7 +31,7 @@ header="#mac,ip,iface,in,out,total,first_date,last_date"
 createDbIfMissing()
 {
 	[ ! -f "$DB" ] && echo $header > "$DB"
-	[ ! -f "${DB}6" ] && echo $header > "${DB}6"
+	[ ! -f "$DB6" ] && echo $header > "$DB6"
 }
 
 checkDbArg()
@@ -40,8 +43,8 @@ checkDB()
 {
 	[ ! -f "$DB" ] && echo "ERROR: $DB does not exist" && exit 1
 	[ ! -w "$DB" ] && echo "ERROR: $DB is not writable" && exit 1
-	[ ! -f "${DB}6" ] && echo "ERROR: ${DB}6 does not exist" && exit 1
-	[ ! -w "${DB}6" ] && echo "ERROR: ${DB}6 is not writable" && exit 1
+	[ ! -f "$DB6" ] && echo "ERROR: $DB6 does not exist" && exit 1
+	[ ! -w "$DB6" ] && echo "ERROR: $DB6 is not writable" && exit 1
 }
 
 checkWAN()
@@ -118,33 +121,53 @@ detectWAN()
 	[ -n "$wan" ] && echo $wan && return
 }
 
-lock()
+lockFunc()
 {
+	#Realize the lock function by busybox lock or flock command.
+	#	if !(lock -n $lockFile) >/dev/null 2>&1; then
+	#		exit 1
+	#	fi
+	#	trap "rm -f /tmp/*_${updatePID}.tmp; kill -9 ${updatePID}; rm -f $lockFile" INT KILL TERM EXIT
+	#The following lock method is realized by other's function.
+
+	local lockFile=$1
 	attempts=0
-	while [ $attempts -lt 10 ]; do
-		mkdir $lockDir 2>/dev/null && break
-		attempts=$((attempts+1))
-		pid=`cat $pidFile 2>/dev/null`
-		if [ -n "$pid" ]; then
-			if [ -d "/proc/$pid" ]; then
-				[ -n "$DEBUG" ] && echo "WARNING: Lockfile detected but process $(cat $pidFile) does not exist !"
-				rm -rf $lockDir
-			else
-				sleep 1
-			fi
+	flag=0
+
+	while [ "$flag" -eq 0 ]; do
+		tempfile=$(mktemp /tmp/lock.XXXXXX)
+		ln $tempfile $lockFile >/dev/null 2>&1 && flag=1
+		rm $tempfile
+
+		if [ "$flag" -eq 1 ]; then
+			[ -n "$DEBUG" ] && echo ${updatePID} "got lock after $attempts attempts"
+			flag=1
+		else
+			sleep 1
+			attempts=$(($attempts+1))
+			[ -n "$DEBUG" ] && echo ${updatePID} "The $attempts attempts."
+			[ "$attempts" -ge 10 ] && exit
 		fi
 	done
-	mkdir $lockDir 2>/dev/null
-	echo $$ > $pidFile
-	[ -n "$DEBUG" ] && echo $$ "got lock after $attempts attempts"
-	trap '' INT
+	trap "" INT
 }
 
-unlock()
+unlockFunc()
 {
-	rm -rf $lockDir
-	[ -n "$DEBUG" ] && echo $$ "released lock"
-	trap "rm -f /tmp/*_$$.tmp; kill $$" INT
+	#Realize the lock function by busybox lock or flock command.
+	#	lockFile=$1
+	#	lock -u $lockFile
+	#	rm -f $lockFile
+	#	rm -f /tmp/*_${updatePID}.tmp
+	#	[ -n "$DEBUG" ] && echo ${updatePID} "released lock"
+	#	trap "" INT KILL TERM EXIT
+	#The following lock method is realized by other's function.
+
+	local lockFile=$1
+	rm -f $lockFile
+	rm -f /tmp/*_${updatePID}.tmp
+	[ -n "$DEBUG" ] && echo ${updatePID} "released lock"
+	trap - INT
 }
 
 # chain
@@ -181,10 +204,62 @@ newRuleIF()
 	fi
 }
 
+publish()
+{
+	trap 'rm -f $lockFile; rm -f /tmp/*_${updatePID}.tmp; rm -f ${pb_html}.tmp; ending' TERM
+
+	# sort DB
+	# busybox sort truncates numbers to 32 bits
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_${updatePID}.tmp
+
+		# create HTML page
+	rm -f ${pb_html}.tmp
+	cp $dataDir/usage.htm1 ${pb_html}.tmp
+
+	#!@todo fix publishing
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
+	do
+		echo "
+new Array(\"$(lookup $MAC $IP $user_def)\",\"$MAC\",\"$IP\",
+$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html}.tmp
+	done < /tmp/sorted_${updatePID}.tmp
+	echo "0);" >> ${pb_html}.tmp
+
+	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> ${pb_html}.tmp
+	mv ${pb_html}.tmp "$pb_html"
+}
+
+updatePrepare() {
+	local timeNow=$(cat /proc/uptime | awk '{print $1}')
+	local timeLast=0
+	if [ -e /var/log/wrtbwmon.log ]; then
+		timeLast=$(awk -F, '{print $1}' /var/log/wrtbwmon.log)
+		interval=$(awk -v now=$timeNow -v last=$timeLast 'BEGIN{print (now-last)}')
+		echo $interval
+
+		if [[ $interval \> 0.2 ]]; then
+			echo $timeNow >/var/log/wrtbwmon.log
+			return 0
+		else
+			return 1
+		fi
+	else
+		echo $timeNow >/var/log/wrtbwmon.log
+		return 0
+	fi
+}
+
 update()
 {
+	trap 'rm -f $lockFile; rm -f /tmp/*_${updatePID}.tmp; ending' TERM
+
 	#!@todo could let readDB.awk handle this; that would place header
 	#!info in fewer places
+	updatePID=$( sh -c 'echo $PPID' )
+	local lockFile=/var/lock/wrtbwmon.lock
+
+	lockFunc $lockFile
+
 	checkDbArg
 	wan=$(detectWAN)
 	checkWAN
@@ -199,7 +274,6 @@ update()
 	[ "$Monitor46" -eq 46 ] && IPT='iptables ip6tables'
 
 	for ii in $IPT ; do
-
 		if [ -z "$( ${ii}-save | grep RRDIPT )" ]; then
 
 			for chain in $chains; do
@@ -213,96 +287,93 @@ update()
 				done
 			done
 		fi
-
 		# this will add rules for hosts in arp table
+		> /tmp/${ii}_${updatePID}.tmp
 
-		> /tmp/${ii}_$$.tmp
-		lock
-		# only zero our own chains
 		for chain in $chains; do
-			$ii -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/${ii}_$$.tmp
+			$ii -nvxL RRDIPT_$chain -t mangle -Z >> /tmp/${ii}_${updatePID}.tmp
 		done
-
 	done
 
-	[ -f /tmp/iptables_$$.tmp ] && (
+	[ -f /tmp/iptables_${updatePID}.tmp ] && (
 		ipReg=`echo $( echo $( uci get network.lan.ipaddr ) | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+' )`;
-		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" -f $binDir/readDB.awk \
+		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" \
+		-f $binDir/readDB.awk \
 		$DB \
 		/proc/net/arp \
-		/tmp/iptables_$$.tmp
+		/tmp/iptables_${updatePID}.tmp
 	)
 
-	[ -f /tmp/ip6tables_$$.tmp ] && (
-		echo "This file is geneated by 'ip -6 neigh'" >/tmp/ip6addr_$$.tmp
-		`ip -6 neigh >>/tmp/ip6addr_$$.tmp`;
+	[ -f /tmp/ip6tables_${updatePID}.tmp ] && (
+		echo "This file is geneated by 'ip -6 neigh'" >/tmp/ip6addr_${updatePID}.tmp
+		`ip -6 neigh >>/tmp/ip6addr_${updatePID}.tmp`;
 		ipReg=`ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
 
-		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" -f $binDir/readDB6.awk \
-		"${DB}6" \
-		/tmp/ip6addr_$$.tmp \
-		/tmp/ip6tables_$$.tmp
+		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" \
+		-f $binDir/readDB6.awk \
+		"$DB6" \
+		/tmp/ip6addr_${updatePID}.tmp \
+		/tmp/ip6tables_${updatePID}.tmp
 	)
 
 	[ "$Monitor46" -eq 46 ] && (
-
-		cp $DB ${DB}46
-		cat ${DB}6 >> ${DB}46
-
-		awk -f $binDir/readDB6.awk "${DB}46"
+		cp $DB $DB46
+		cat $DB6 >> $DB46
+		awk -f $binDir/readDB6.awk "$DB46"
 	)
-
-	unlock
 
 	# the iptables and readDB commands have to be separate. Otherwise,
 	# they will fight over iptables locks
 
-	rm -f /tmp/*_$$.tmp
+	[ -n "$pb_html" ] && publish
+
+	unlockFunc $lockFile
 }
 
-publish()
-{
-	# sort DB
-	lock
-
-	# busybox sort truncates numbers to 32 bits
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_$$.tmp
-
-		# create HTML page
-	rm -f ${pb_html}.tmp
-	cp $dataDir/usage.htm1 ${pb_html}.tmp
-
-	#!@todo fix publishing
-	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
-	do
-		echo "
-new Array(\"$(lookup $MAC $IP $user_def)\",\"$MAC\",\"$IP\",
-$PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html}.tmp
-	done < /tmp/sorted_$$.tmp
-	echo "0);" >> ${pb_html}.tmp
-
-	sed "s/(date)/`date`/" < $dataDir/usage.htm2 >> ${pb_html}.tmp
-	mv ${pb_html}.tmp "$pb_html"
-
-	unlock
-
-	#Free some memory
-	rm -f /tmp/*_$$.tmp
-}
-
-quitShell()
+ending()
 {
 	iptables-save | grep -v RRDIPT | iptables-restore
 	ip6tables-save | grep -v RRDIPT | ip6tables-restore
-	rm -rf "$lockDir"
 
 	if [ -e '/var/run/wrtbwmon.pid' ]; then
-		kill -9 $( cat /var/run/wrtbwmon.pid ) >> /dev/null 2>&1
+		local pid=$( cat /var/run/wrtbwmon.pid )
+		kill -9 $pid >> /dev/null 2>&1
 	fi
 
 	rm -f /var/run/wrtbwmon.pid >> /dev/null 2>&1
-
 	echo "exit!!"
+}
+
+loop()
+{
+	if [ -e /var/run/wrtbwmon.pid ]; then
+		echo "Another wrtbwmon is on running!!!"
+	else
+		sh -c 'echo $PPID > /var/run/wrtbwmon.pid' && :
+		while true ;do
+			updatePrepare && update
+			sleep 1m
+		done
+	fi
+}
+
+tips()
+{
+	echo \
+"Usage: $0 [options...]
+Options:
+   -k 			Exit the wrtbwmon!
+   -f dbfile	Set the DB file path
+   -u usrfile	Set the user_def file path
+   -p htmlfile	Set the publish htm file path
+   -d			Enter the foreground mode.
+   -D			Enter the daemo mode.
+   -4			Listen to ipv4 only.
+   -6			Listen to ipv6 only.
+   -46			Listen to ipv4 and ipv6.
+
+Note: [user_file] is an optional file to match users with MAC addresses.
+	   Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
 }
 
 ############################################################
@@ -310,13 +381,15 @@ quitShell()
 while [ $# != 0 ];do
 	case $1 in
 		"-k" )
-			quitShell
+			ending
 			exit 1
 		;;
 		"-f" )
 			shift
 			if [ $# -gt 0 ];then
 				DB=$1
+				DB6=$( echo "${DB%.*}.6.${DB##*.}" )
+				DB46=$( echo "${DB%.*}.46.${DB##*.}" )
 			else
 				echo "No db file path seted, exit!!"
 				exit 1
@@ -342,8 +415,12 @@ while [ $# != 0 ];do
 			fi
 		;;
 
-		"-b")
-			batchMod=true
+		"-d")
+			runMode=1
+		;;
+
+		"-D")
+			runMode=2
 		;;
 
 		"-4")
@@ -356,59 +433,24 @@ while [ $# != 0 ];do
 
 		"-46")
 			Monitor46=46
+		;;
 
+		"&&" | "||" | ";")
+			break
 		;;
 
 		"*")
-	echo \
-"Usage: $0 {-k|update|publish|remove} [options...]
-Options:
-   $0 -k Exit the wrtbwmon!
-   $0 -f filepath Set the DB file path
-   $0 -u filepath Set the user_def file path
-   $0 -p filepath Set the publish htm file path
-
-Note: [user_file] is an optional file to match users with MAC addresses.
-	   Its format is \"00:MA:CA:DD:RE:SS,username\", with one entry per line."
-
+			tips
+		;;
 	esac
-shift
+
+	shift
 done
 
-[ -z "$DB" ] && echo "ERROR: $DB does not exist" && exit 1
-
-if "$batchMod" ;then
-
-	if [ -e /var/run/wrtbwmon.pid ]
-	then
-		echo "Another wrtbwmon is on running!!!"
-	else
-		echo $$ > /var/run/wrtbwmon.pid
-		while true ;do
-			timeNow=$(cat /proc/uptime | awk '{print $1}')
-			if [ -e /var/log/wrtbwmon.log ]; then
-				timeOld=$(awk -F, '{print $1+$2}' /var/log/wrtbwmon.log)
-				xTime=$(awk -v c1=$timeNow -v c2=$timeOld 'BEGIN{print c1-c2}')
-				if [ $xTime \> 0.5 ];then
-					echo $timeNow',30' >/var/log/wrtbwmon.log
-					upflag=1
-				else
-					upflag=0
-				fi
-			else
-				echo $timeNow',30' >/var/log/wrtbwmon.log
-				upflag=1
-			fi
-
-			if [ $upflag -eq 1 ]; then
-				update
-				[ -n "$pb_html" ] && publish
-			fi
-			sleep 30s
-		done
-	fi
+if [ "$runMode" \= '1' ]; then
+	loop
+elif [ "$runMode" \= '2' ]; then
+	loop >>/dev/null 2>&1 &
 else
-	update
-	[ -n "$pb_html" ] && publish
-	exit 0
+	updatePrepare && update
 fi
