@@ -7,6 +7,8 @@ Monitor46=4
 updatePID=
 
 # Default parameters for readDB.awk.
+interval4=0
+interval6=0
 mode=
 DEBUG=
 
@@ -26,7 +28,7 @@ interfaces='eth0 tun0' # in addition to detected WAN
 # don't perform reverse DNS lookups by default
 DO_RDNS=${DNS-}
 
-header="#mac,ip,iface,in,out,total,first_date,last_date"
+header="#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date"
 
 createDbIfMissing()
 {
@@ -210,17 +212,17 @@ publish()
 
 	# sort DB
 	# busybox sort truncates numbers to 32 bits
-	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_${updatePID}.tmp
+	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$6/1e6); $6=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_${updatePID}.tmp
 
-		# create HTML page
+	# create HTML page
 	rm -f ${pb_html}.tmp
 	cp $dataDir/usage.htm1 ${pb_html}.tmp
 
 	#!@todo fix publishing
-	while IFS=, read PEAKUSAGE_IN MAC IP IFACE PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
+	while IFS=, read PEAKUSAGE_IN MAC IP IFACE SPEED_IN SPEED_OUT PEAKUSAGE_OUT TOTAL FIRSTSEEN LASTSEEN
 	do
 		echo "
-new Array(\"$(lookup $MAC $IP $user_def)\",\"$MAC\",\"$IP\",
+new Array(\"$(lookup $MAC $IP $user_def)\",\"$MAC\",\"$IP\",$SPEED_IN,$SPEED_OUT,
 $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html}.tmp
 	done < /tmp/sorted_${updatePID}.tmp
 	echo "0);" >> ${pb_html}.tmp
@@ -232,19 +234,43 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html
 updatePrepare() {
 	local timeNow=$(cat /proc/uptime | awk '{print $1}')
 	local timeLast=0
+	local interval=0
 	if [ -e /var/log/wrtbwmon.log ]; then
 		timeLast=$(awk -F, '{print $1}' /var/log/wrtbwmon.log)
-		interval=$(awk -v now=$timeNow -v last=$timeLast 'BEGIN{print (now-last)}')
-		echo $interval
+		ipType=$(awk -F, '{print $2}' /var/log/wrtbwmon.log)
 
-		if [[ $interval \> 0.2 ]]; then
-			echo $timeNow >/var/log/wrtbwmon.log
-			return 0
+		[ -z "$ipType" ] && ipType=4
+		interval=$(awk -v now=$timeNow -v last=$timeLast 'BEGIN{print (now-last)}');
+
+		if [ "$ipType" -eq "46" ] || [ "$ipType" = "$Monitor46" ]; then
+			interval4=$interval;
+			interval6=$interval;
+		elif [ "$ipType" -eq "4" ] && [ "$Monitor46" = "6" ]; then
+			interval4=0
+			interval6=0
+		elif [ "$ipType" -eq "4" ] && [ "$Monitor46" = "46" ]; then
+			interval4=$interval;
+			interval6=0
 		else
-			return 1
+			interval4=0
+			interval6=$interval;
 		fi
+
+		[[ "$interval4" != "0" ]] || [[ "$interval6" != "0" ]] && {
+			echo $interval;
+
+			if [[ "$interval" \> "0.9" ]]; then
+				echo "$timeNow,$Monitor46" >/var/log/wrtbwmon.log
+				return 0
+			else
+				return 1
+			fi
+		} || {
+			echo "$timeNow,$Monitor46" >/var/log/wrtbwmon.log;
+			return 0;
+		}
 	else
-		echo $timeNow >/var/log/wrtbwmon.log
+		echo "$timeNow,$Monitor46" >/var/log/wrtbwmon.log
 		return 0
 	fi
 }
@@ -297,7 +323,7 @@ update()
 
 	[ -f /tmp/iptables_${updatePID}.tmp ] && (
 		ipReg=`echo $( echo $( uci get network.lan.ipaddr ) | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+' )`;
-		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" \
+		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" -v interval=$interval4 \
 		-f $binDir/readDB.awk \
 		$DB \
 		/proc/net/arp \
@@ -309,7 +335,7 @@ update()
 		`ip -6 neigh >>/tmp/ip6addr_${updatePID}.tmp`;
 		ipReg=`ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
 
-		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" \
+		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" -v interval=$interval6 \
 		-f $binDir/readDB6.awk \
 		"$DB6" \
 		/tmp/ip6addr_${updatePID}.tmp \

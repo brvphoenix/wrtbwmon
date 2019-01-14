@@ -62,22 +62,25 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 		mac[lb]			= $1
 		ip[lb]			= $2
 		inter[lb]		= $3
-		bw[lb "/in"]	= $4
-		bw[lb "/out"]	= $5
-		firstDate[lb]	= $7
-		lastDate[lb]	= $8
+		bw[lb "/in"]	= $6
+		bw[lb "/out"]	= $7
+		firstDate[lb]	= $9
+		lastDate[lb]	= $10
 	}
 	else{
-		if(DateToStr($7)<DateToStr(firstDate[lb]))
-			firstDate[lb]	= $7
-		if(DateToStr($8)>DateToStr(lastDate[lb])){
+		if(DateToStr($9) < DateToStr(firstDate[lb]))
+			firstDate[lb]	= $9
+		if(DateToStr($10) > DateToStr(lastDate[lb])){
 			ip[lb]			= $2
 			inter[lb]		= $3
-			lastDate[lb]	= $8
+			lastDate[lb]	= $10
 		}
-		bw[lb "/in"]	= bw[lb "/in"] + $4
-		bw[lb "/out"]	= bw[lb "/out"] + $5
+		bw[lb "/in"]	= bw[lb "/in"] + $6
+		bw[lb "/out"]	= bw[lb "/out"] + $7
 	}
+
+	speed[lb "/in"]		= 0
+	speed[lb "/out"]	= 0
 	next
 }
 
@@ -191,14 +194,19 @@ END {
 		mac[lb]		= arp_mac[ii]
 		ip[lb]		= arp_ip[ii]
 		inter[lb]	= arp_inter[ii]
+
+		if(interval != 0) {
+			speed[lb "/in"]		= int(arp_bw[ii "/in"] / interval)
+			speed[lb "/out"]	= int(arp_bw[ii "/out"] / interval)
+		}
 	}
 
 	close(dbFile)
-	print "#mac,ip,iface,in,out,total,first_date,last_date" > dbFile
+	print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
 	OFS=","
 
 	for(i in mac)
-		print mac[i], ip[i], inter[i], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+		print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
 	close(dbFile)
 	# for hosts without rules
 	for(host in hosts) if(!inInterfaces(host)) newRule(host)
