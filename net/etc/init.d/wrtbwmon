@@ -37,5 +37,6 @@ start_service() {
 }
 
 stop_service(){
+	procd_kill wrtbwmon && rm -f /var/run/wrtbwmon.pid >> /dev/null 2>&1
 	/usr/sbin/wrtbwmon -k
 }
