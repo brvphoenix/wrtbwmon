@@ -8,7 +8,7 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wrtbwmon
-PKG_VERSION:=0.8.0
+PKG_VERSION:=0.8.1
 PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
@@ -45,6 +45,9 @@ define Package/wrtbwmon/install
 
 	$(INSTALL_DIR) $(1)/etc/init.d
 	$(INSTALL_BIN) ./net/etc/init.d/wrtbwmon $(1)/etc/init.d/wrtbwmon
+
+	$(INSTALL_DIR) $(1)/etc/config
+	$(INSTALL_BIN) ./net/etc/config/wrtbwmon $(1)/etc/config/wrtbwmon
 endef
 
 $(eval $(call BuildPackage,wrtbwmon))
