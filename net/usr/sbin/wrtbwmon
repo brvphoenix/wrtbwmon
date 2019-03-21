@@ -1,12 +1,17 @@
 #!/bin/sh
 #
 
-# Default parameters for wrtbwmon.
+# Default input parameters for wrtbwmon.
 runMode=0
 Monitor46=4
-updatePID=
 
-# Default parameters for readDB.awk.
+# Some parameters for monitor process.
+updatePID=
+logFile=/var/log/wrtbwmon.log
+lockFile=/var/lock/wrtbwmon.lock
+pidFile=/var/run/wrtbwmon.pid
+
+# Debug parameters for readDB.awk.
 mode=
 DEBUG=
 
@@ -54,9 +59,11 @@ checkWAN()
 
 lookup()
 {
-	MAC=$1
-	IP=$2
-	userDB=$3
+	local MAC=$1
+	local IP=$2
+	local userDB=$3
+	local USERSFILE=
+	local USER=
 	for USERSFILE in $userDB /tmp/dhcp.leases /tmp/dnsmasq.conf /etc/dnsmasq.conf /etc/hosts; do
 		[ -e "$USERSFILE" ] || continue
 
@@ -87,9 +94,10 @@ lookup()
 
 detectIF()
 {
+	local IF=
 	if [ -f "$networkFuncs" ]; then
 		IF=`. $networkFuncs; network_get_device netdev $1; echo $netdev`
-	[ -n "$IF" ] && echo $IF && return
+		[ -n "$IF" ] && echo $IF && return
 	fi
 
 	if [ -n "$uci" -a -x "$uci" ]; then
@@ -106,14 +114,13 @@ detectIF()
 detectLAN()
 {
 	[ -e /sys/class/net/br-lan ] && echo br-lan && return
-	lan=$(detectIF lan)
+	local lan=$(detectIF lan)
 	[ -n "$lan" ] && echo $lan && return
 }
 
 detectWAN()
 {
-	[ -n "$WAN_IF" ] && echo $WAN_IF && return
-	wan=$(detectIF wan)
+	local wan=$(detectIF wan)
 	[ -n "$wan" ] && echo $wan && return
 	wan=$(ip route show 2>/dev/null | grep default | sed -re '/^default/ s/default.*dev +([^ ]+).*/\1/')
 	[ -n "$wan" ] && echo $wan && return
@@ -130,16 +137,15 @@ lockFunc()
 	#	trap "rm -f /tmp/*_${updatePID}.tmp; kill -9 ${updatePID}; rm -f $lockFile" INT KILL TERM EXIT
 	#The following lock method is realized by other's function.
 
-	local lockFile=$1
-	attempts=0
-	flag=0
+	local attempts=0
+	local flag=0
 
-	while [ "$flag" -eq 0 ]; do
-		tempfile=$(mktemp /tmp/lock.XXXXXX)
+	while [ "$flag" = 0 ]; do
+		local tempfile=$(mktemp /tmp/lock.XXXXXX)
 		ln $tempfile $lockFile >/dev/null 2>&1 && flag=1
 		rm $tempfile
 
-		if [ "$flag" -eq 1 ]; then
+		if [ "$flag" = 1 ]; then
 			[ -n "$DEBUG" ] && echo ${updatePID} "got lock after $attempts attempts"
 			flag=1
 		else
@@ -155,7 +161,6 @@ lockFunc()
 unlockFunc()
 {
 	#Realize the lock function by busybox lock or flock command.
-	#	lockFile=$1
 	#	lock -u $lockFile
 	#	rm -f $lockFile
 	#	rm -f /tmp/*_${updatePID}.tmp
@@ -163,7 +168,6 @@ unlockFunc()
 	#	trap "" INT KILL TERM EXIT
 	#The following lock method is realized by other's function.
 
-	local lockFile=$1
 	rm -f $lockFile
 	rm -f /tmp/*_${updatePID}.tmp
 	[ -n "$DEBUG" ] && echo ${updatePID} "released lock"
@@ -173,8 +177,8 @@ unlockFunc()
 # chain
 newChain()
 {
-	chain=$1
-	ipt=$2
+	local chain=$1
+	local ipt=$2
 	# Create the RRDIPT_$chain chain (it doesn't matter if it already exists).
 
 	$ipt -t mangle -N RRDIPT_$chain 2> /dev/null
@@ -190,9 +194,10 @@ newChain()
 # chain tun
 newRuleIF()
 {
-	chain=$1
-	IF=$2
-	ipt=$3
+	local chain=$1
+	local IF=$2
+	local ipt=$3
+	local cmd=
 
 	#!@todo test
 	if [ "$chain" = "OUTPUT" ]; then
@@ -212,7 +217,7 @@ publish()
 	# busybox sort truncates numbers to 32 bits
 	grep -v '^#' $DB | awk -F, '{OFS=","; a=sprintf("%f",$4/1e6); $4=""; print a,$0}' | tr -s ',' | sort -rn | awk -F, '{OFS=",";$1=sprintf("%f",$1*1e6);print}' > /tmp/sorted_${updatePID}.tmp
 
-		# create HTML page
+	# create HTML page
 	rm -f ${pb_html}.tmp
 	cp $dataDir/usage.htm1 ${pb_html}.tmp
 
@@ -232,19 +237,19 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html
 updatePrepare() {
 	local timeNow=$(cat /proc/uptime | awk '{print $1}')
 	local timeLast=0
-	if [ -e /var/log/wrtbwmon.log ]; then
-		timeLast=$(awk -F, '{print $1}' /var/log/wrtbwmon.log)
+	if [ -e "$logFile" ]; then
+		timeLast=$(awk -F, '{print $1}' "$logFile")
 		interval=$(awk -v now=$timeNow -v last=$timeLast 'BEGIN{print (now-last)}')
 		echo $interval
 
 		if [[ $interval \> 0.2 ]]; then
-			echo $timeNow >/var/log/wrtbwmon.log
+			echo $timeNow >"$logFile"
 			return 0
 		else
 			return 1
 		fi
 	else
-		echo $timeNow >/var/log/wrtbwmon.log
+		echo $timeNow >"$logFile"
 		return 0
 	fi
 }
@@ -256,9 +261,8 @@ update()
 	#!@todo could let readDB.awk handle this; that would place header
 	#!info in fewer places
 	updatePID=$( sh -c 'echo $PPID' )
-	local lockFile=/var/lock/wrtbwmon.lock
 
-	lockFunc $lockFile
+	lockFunc
 
 	checkDbArg
 	wan=$(detectWAN)
@@ -269,9 +273,9 @@ update()
 	createDbIfMissing
 	checkDB
 
-	[ "$Monitor46" -eq 4 ] && IPT='iptables'
-	[ "$Monitor46" -eq 6 ] && IPT='ip6tables'
-	[ "$Monitor46" -eq 46 ] && IPT='iptables ip6tables'
+	[ "$Monitor46" = 4 ] && IPT='iptables'
+	[ "$Monitor46" = 6 ] && IPT='ip6tables'
+	[ "$Monitor46" = 46 ] && IPT='iptables ip6tables'
 
 	for ii in $IPT ; do
 		if [ -z "$( ${ii}-save | grep RRDIPT )" ]; then
@@ -296,7 +300,7 @@ update()
 	done
 
 	[ -f /tmp/iptables_${updatePID}.tmp ] && (
-		ipReg=`echo $( echo $( uci get network.lan.ipaddr ) | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+' )`;
+		ipReg=`uci get network.lan.ipaddr | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+'`;
 		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" \
 		-v ipv6="0" -f $binDir/readDB.awk \
 		$DB \
@@ -309,14 +313,14 @@ update()
 		`ip -6 neigh >>/tmp/ip6addr_${updatePID}.tmp`;
 		ipReg=`ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
 
-		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" \
+		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" \
 		-v ipv6="1" -f $binDir/readDB.awk \
 		"$DB6" \
 		/tmp/ip6addr_${updatePID}.tmp \
 		/tmp/ip6tables_${updatePID}.tmp
 	)
 
-	[ "$Monitor46" -eq 46 ] && (
+	[ "$Monitor46" = 46 ] && (
 		cp $DB $DB46
 		cat $DB6 >> $DB46
 		awk -f $binDir/readDB.awk "$DB46"
@@ -327,7 +331,7 @@ update()
 
 	[ -n "$pb_html" ] && publish
 
-	unlockFunc $lockFile
+	unlockFunc
 }
 
 ending()
@@ -335,21 +339,21 @@ ending()
 	iptables-save | grep -v RRDIPT | iptables-restore
 	ip6tables-save | grep -v RRDIPT | ip6tables-restore
 
-	if [ -e '/var/run/wrtbwmon.pid' ]; then
-		local pid=$( cat /var/run/wrtbwmon.pid )
+	if [ -e "$pidFile" ]; then
+		local pid=$( cat "$pidFile" )
 		kill -9 $pid >> /dev/null 2>&1
 	fi
 
-	rm -f /var/run/wrtbwmon.pid >> /dev/null 2>&1
+	rm -f "$pidFile" >> /dev/null 2>&1
 	echo "exit!!"
 }
 
 loop()
 {
-	if [ -e /var/run/wrtbwmon.pid ]; then
+	if [ -e "$pidFile" ]; then
 		echo "Another wrtbwmon is on running!!!"
 	else
-		sh -c 'echo $PPID > /var/run/wrtbwmon.pid' && :
+		sh -c 'echo $PPID > $pidFile' && :
 		while true ;do
 			updatePrepare && update
 			sleep 1m
@@ -382,7 +386,7 @@ while [ $# != 0 ];do
 	case $1 in
 		"-k" )
 			ending
-			exit 1
+			exit 0
 		;;
 		"-f" )
 			shift
@@ -447,9 +451,9 @@ while [ $# != 0 ];do
 	shift
 done
 
-if [ "$runMode" \= '1' ]; then
+if [ "$runMode" = '1' ]; then
 	loop
-elif [ "$runMode" \= '2' ]; then
+elif [ "$runMode" = '2' ]; then
 	loop >>/dev/null 2>&1 &
 else
 	updatePrepare && update
