@@ -26,10 +26,8 @@ function total(i) {
 }
 
 BEGIN {
-	od=""
-	fid=1
-	debug=0
-	rrd=0
+	fid = 1
+	rrd = 0
 	if (ipv6) {
 		tbNF	= 8
 		iptKey	= "ip6tables"
@@ -40,8 +38,8 @@ BEGIN {
 }
 
 /^#/ { # get DB filename
-	FS=","
-	dbFile=FILENAME
+	FS	= ","
+	dbFile	= FILENAME
 	next
 }
 
@@ -153,7 +151,7 @@ fid==3 && rrd { # iptables input
 		if (m in hosts && !inInterfaces(m)) delete hosts[m]
 
 		if (mode == "diff" || mode == "noUpdate") print n, $2
-		if (mode!="noUpdate") {
+		if (mode != "noUpdate") {
 			if (inInterfaces(m)) { # if label is an interface
 				if (!(m in arp_mac)) {
 				# if label was not in db (also not in
@@ -178,10 +176,10 @@ fid==3 && rrd { # iptables input
 }
 
 END {
-	if (mode=="noUpdate") exit
+	if (mode == "noUpdate") exit
 
 	for (ii in arp_ip) {
-		lb=arp_mac[ii]
+		lb = arp_mac[ii]
 
 		if (lb in mac) {
 			if (arp_lastDate[ii] != "") {
@@ -198,7 +196,7 @@ END {
 		ip[lb]		= arp_ip[ii]
 		inter[lb]	= arp_inter[ii]
 
-		if (interval != 0) {
+		if (interval != 0 && arp_lastDate[ii] != "") {
 			speed[lb "/in"]	= int(arp_bw[ii "/in"] / interval)
 			speed[lb "/out"]= int(arp_bw[ii "/out"] / interval)
 		}
@@ -212,5 +210,5 @@ END {
 		print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
 	close(dbFile)
 	# for hosts without rules
-	for(host in hosts) if(!inInterfaces(host)) newRule(host)
+	for (host in hosts) if (!inInterfaces(host)) newRule(host)
 }
