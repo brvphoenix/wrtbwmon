@@ -6,6 +6,7 @@ runMode=0
 Monitor46=4
 
 # Some parameters for monitor process.
+for46=
 updatePID=
 logFile=/var/log/wrtbwmon.log
 lockFile=/var/lock/wrtbwmon.lock
@@ -229,47 +230,28 @@ $PEAKUSAGE_IN,$PEAKUSAGE_OUT,$TOTAL,\"$FIRSTSEEN\",\"$LASTSEEN\")," >> ${pb_html
 }
 
 updatePrepare() {
+	for46="$Monitor46"
 	local timeNow=$(cat /proc/uptime | awk '{print $1}')
-	local timeLast=0
-	local interval=0
+
 	if [ -e "$logFile" ]; then
-		timeLast=$(awk -F, '{print $1}' "$logFile")
-		ipType=$(awk -F, '{print $2}' "$logFile")
+		local timeLast4=$(awk -F'[: ]+' '/ipv4/{print $2}' "$logFile")
+		local timeLast6=$(awk -F'[: ]+' '/ipv6/{print $2}' "$logFile")
+		interval4=$(awk -v now=$timeNow -v last=$timeLast4 'BEGIN{print (now-last)}');
+		interval6=$(awk -v now=$timeNow -v last=$timeLast6 'BEGIN{print (now-last)}');
 
-		[ -z "$ipType" ] && ipType=4
-		interval=$(awk -v now=$timeNow -v last=$timeLast 'BEGIN{print (now-last)}');
-
-		if [ "$ipType" = "46" ] || [ "$ipType" = "$Monitor46" ]; then
-			interval4=$interval;
-			interval6=$interval;
-		elif [ "$ipType" = "4" ] && [ "$Monitor46" = "6" ]; then
-			interval4=0
-			interval6=0
-		elif [ "$ipType" = "4" ] && [ "$Monitor46" = "46" ]; then
-			interval4=$interval;
-			interval6=0
-		else
-			interval4=0
-			interval6=$interval;
-		fi
-
-		[[ "$interval4" != "0" ]] || [[ "$interval6" != "0" ]] && {
-			echo $interval;
-
-			if [[ "$interval" \> "0.9" ]]; then
-				echo "$timeNow,$Monitor46" >"$logFile"
-				return 0
-			else
-				return 1
-			fi
-		} || {
-			echo "$timeNow,$Monitor46" >"$logFile";
-			return 0;
-		}
+		for ii in 4 6; do
+			[[ -n "$(echo $for46 | grep ${ii})" ]] && {
+				if [[ "$(eval echo \$interval${ii})" \> "0.9" ]]; then
+					sed -i "s/^ipv${ii}: [0-9\.]\{1,\}/ipv${ii}: $timeNow/ig" "$logFile"
+				else
+					for46=`echo "$for46" | sed "s/${ii}//g"`
+				fi
+			}
+		done
 	else
-		echo "$timeNow,$Monitor46" >"$logFile"
-		return 0
+		echo -e "ipv4: $timeNow\nipv6: $timeNow" >"$logFile"
 	fi
+	return 0
 }
 
 update()
@@ -287,9 +269,9 @@ update()
 	createDbIfMissing
 	checkDB
 
-	[ "$Monitor46" = 4 ] && IPT='iptables'
-	[ "$Monitor46" = 6 ] && IPT='ip6tables'
-	[ "$Monitor46" = 46 ] && IPT='iptables ip6tables'
+	[ "$for46" = 4 ] && IPT='iptables'
+	[ "$for46" = 6 ] && IPT='ip6tables'
+	[ "$for46" = 46 ] && IPT='iptables ip6tables'
 
 	for ii in $IPT ; do
 		if [ -z "$( ${ii}-save | grep RRDIPT )" ]; then
