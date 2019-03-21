@@ -1,13 +1,19 @@
 <html><head><title>Traffic</title>
 <script type="text/javascript">
-function getSize(size) {
-    var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
-    var pos=0;
-    while (size>base) {
-        size/=base; pos++;
-    }
-    if (pos > 2) precision=1000; else precision = 1;
-    return (Math.round(size*precision)/precision)+' '+prefix[pos];}
+	function getSize(size) {
+		var prefix=new Array("","k","M","G","T","P","E","Z"); var base=1000;
+		var pos=0;
+		while (size>base) {
+			size/=base; pos++;
+		}
+		if (pos > 2) precision=1000; else precision = 1;
+		return (Math.round(size*precision)/precision)+' '+prefix[pos];
+	}
+	function dateToString(date) {
+		var d = new Date((/\W/g).test(date) ? date : date * 1000);
+		d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+		return d.toJSON().substr(0, 19).replace("T", " ")
+	}
 </script></head>
 <body><h1>Total Usage:</h1>
 <table border="1">

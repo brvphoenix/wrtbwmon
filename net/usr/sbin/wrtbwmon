@@ -324,7 +324,7 @@ update()
 	[ -f /tmp/iptables_${updatePID}.tmp ] && (
 		ipReg=`echo $( echo $( uci get network.lan.ipaddr ) | grep -o -e '\([0-9]\+\.\)\{2\}[0-9]\+' )`;
 		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="$ipReg" -v wanIF="$wan" -v interval=$interval4 \
-		-f $binDir/readDB.awk \
+		-v ipv6="0" -f $binDir/readDB.awk \
 		$DB \
 		/proc/net/arp \
 		/tmp/iptables_${updatePID}.tmp
@@ -336,7 +336,7 @@ update()
 		ipReg=`ip -6 route | grep default | awk '{print $3}' | awk -F: '{print $1}'`;
 
 		awk -v mode="$mode" -v interfaces="$interfaces" -v ipReg="2001" -v wanIF="$wan" -v interval=$interval6 \
-		-f $binDir/readDB6.awk \
+		-v ipv6="1" -f $binDir/readDB.awk \
 		"$DB6" \
 		/tmp/ip6addr_${updatePID}.tmp \
 		/tmp/ip6tables_${updatePID}.tmp
@@ -345,7 +345,7 @@ update()
 	[ "$Monitor46" -eq 46 ] && (
 		cp $DB $DB46
 		cat $DB6 >> $DB46
-		awk -f $binDir/readDB6.awk "$DB46"
+		awk -f $binDir/readDB.awk "$DB46"
 	)
 
 	# the iptables and readDB commands have to be separate. Otherwise,

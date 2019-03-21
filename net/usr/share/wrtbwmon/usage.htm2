@@ -10,7 +10,7 @@ for (i=0; i < values.length-1; i++) {
 	document.write("<tr><td><div title=\"" + values[i][1] + " (" + values[i][2] + ")" + "\">" + values[i][0] + "</div></td>");
 	for (j=3; j < 8; j++)
 		document.write("<td>" + getSize(values[i][j]) + ((j == 3) || (j ==4) ? 'B/s' : 'B') + "</td>");
-	document.write("<td>" + values[i][8] + "</td><td>" + values[i][9] + "</td></tr>");
+	document.write("<td>" + dateToString(values[i][8]) + "</td><td>" + dateToString(values[i][9]) + "</td></tr>");
 }
 document.write("<tr><td>TOTAL</td><td>" + getSize(speedIn) + "B/s" + "</td><td>" + getSize(speedOut) + "B/s" + "</td><td>" + getSize(totalIn) + "</td><td>" + getSize(totalOut) + "</td><td>" + getSize(totalIn + totalOut) + "</td><td></td><td></td></tr>");
 </script></table>
