@@ -51,6 +51,8 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 		mac[lb]		= $1
 		ip[lb]		= $2
 		inter[lb]	= $3
+		speed[lb "/in"]	= 0
+		speed[lb "/out"]= 0
 		bw[lb "/in"]	= $6
 		bw[lb "/out"]	= $7
 		firstDate[lb]	= $9
@@ -67,8 +69,6 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 		bw[lb "/out"]	+= $7
 	}
 
-	speed[lb "/in"]		= 0
-	speed[lb "/out"]	= 0
 	next
 }
 
@@ -83,7 +83,7 @@ FNR==1 {
 fid==2 {
 	#!@todo regex match IPs and MACs for sanity
 	if (ipv6) {
-		statFlag= ($4!="FAILED" && $4!="INCOMPLETE")
+		statFlag= ($4 != "FAILED" && $4 != "INCOMPLETE")
 		macAddr	= $5
 		hwIF	= $3
 	} else {
@@ -188,6 +188,7 @@ END {
 				lastDate[lb]	= arp_lastDate[ii]
 			}
 		} else {
+			speed[lb "/in"]	= speed[lb "/out"] = 0
 			bw[lb "/in"]	= arp_bw[ii "/in"]
 			bw[lb "/out"]	= arp_bw[ii "/out"]
 			firstDate[lb]	= lastDate[lb] = arp_firstDate[ii]
