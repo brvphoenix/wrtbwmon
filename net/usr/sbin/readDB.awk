@@ -80,7 +80,7 @@ FNR==1 {
 fid==2 {
 	#!@todo regex match IPs and MACs for sanity
 	if (ipv6) {
-		statFlag= ($4!="FAILED" && $4!="INCOMPLETE")
+		statFlag= ($4! = "FAILED" && $4! = "INCOMPLETE")
 		macAddr	= $5
 		hwIF	= $3
 	} else {
