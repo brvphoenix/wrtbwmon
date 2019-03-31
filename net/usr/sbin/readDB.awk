@@ -15,10 +15,9 @@ function newRule(arp_ip, ipt_cmd) {
 }
 
 function delRule(arp_ip, ipt_cmd) {
-	ipt_cmd=iptKey " -t mangle -D RRDIPT_FORWARD -s " arp_ip
-	system(ipt_cmd " -j RETURN 2>/dev/null")
-	ipt_cmd=iptKey " -t mangle -D RRDIPT_FORWARD -d " arp_ip
-	system(ipt_cmd " -j RETURN 2>/dev/null")
+	ipt_cmd=iptKey " -t mangle -D RRDIPT_FORWARD -j RETURN "
+	system(ipt_cmd "-s " arp_ip " 2>/dev/null")
+	system(ipt_cmd "-d " arp_ip " 2>/dev/null")
 }
 
 function total(i) {
@@ -26,13 +25,11 @@ function total(i) {
 }
 
 BEGIN {
-	fid = 1
-	rrd = 0
 	if (ipv6) {
-		tbNF	= 8
+		iptNF	= 8
 		iptKey	= "ip6tables"
 	} else {
-		tbNF	= 9
+		iptNF	= 9
 		iptKey	= "iptables"
 	}
 }
@@ -44,8 +41,10 @@ BEGIN {
 }
 
 # data from database; first file
-FNR==NR { #!@todo this doesn't help if the DB file is empty.
+ARGIND==1 { #!@todo this doesn't help if the DB file is empty.
 	lb=$1
+
+	if (lb !~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") next
 
 	if (!(lb in mac)) {
 		mac[lb]		= $1
@@ -68,19 +67,17 @@ FNR==NR { #!@todo this doesn't help if the DB file is empty.
 		bw[lb "/in"]	+= $6
 		bw[lb "/out"]	+= $7
 	}
-
 	next
 }
 
 # not triggered on the first file
 FNR==1 {
 	FS=" "
-	fid++ #!@todo use fid for all files; may be problematic for empty files
-	if(fid == 2) next
+	if(ARGIND == 2) next
 }
 
 # arp: ip hw flags hw_addr mask device
-fid==2 {
+ARGIND==2 {
 	#!@todo regex match IPs and MACs for sanity
 	if (ipv6) {
 		statFlag= ($4 != "FAILED" && $4 != "INCOMPLETE")
@@ -93,8 +90,8 @@ fid==2 {
 	}
 
 	lb=$1
-	if (hwIF != wanIF && lb ~ "^" ipReg && statFlag) {
-		hosts[lb]		= ""
+	if (hwIF != wanIF && lb ~ "^" ipReg && statFlag && macAddr ~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") {
+		hosts[lb]		= 1
 		arp_mac[lb]		= macAddr
 		arp_ip[lb]		= $1
 		arp_inter[lb]		= hwIF
@@ -111,18 +108,7 @@ fid==2 {
 # network to rule creation. The "unnact" rules would have to be
 # maintained at the end of the list, and new rules would be inserted
 # at the top.
-
-# skip line
-# read the chain name and deal with the data accordingly
-
-fid==3 && $1 == "Chain" {
-	rrd=$2 ~ /RRDIPT_.*/
-	next
-}
-
-fid==3 && rrd && (NF < tbNF || $1=="pkts") { next }
-
-fid==3 && rrd { # iptables input
+ARGIND==3 && NF==iptNF && $1!="pkts" { # iptables input
 	if (ipv6) {
 		lfn = 5
 		tag = "::/0"
@@ -145,32 +131,27 @@ fid==3 && rrd { # iptables input
 		n = m "/in"
 	}
 
-	if (!(m in arp_ip) && !inInterfaces(m)) {
-		delRule(m)
-	} else {
-		if (m in hosts && !inInterfaces(m)) delete hosts[m]
-
-		if (mode == "diff" || mode == "noUpdate") print n, $2
-		if (mode != "noUpdate") {
-			if (inInterfaces(m)) { # if label is an interface
-				if (!(m in arp_mac)) {
-				# if label was not in db (also not in
-				# arp table, but interfaces won't be
-				# there anyway
-					cmd = "cat /sys/class/net/" m "/address"
-					cmd | getline arp_mac[m]
-					close(cmd)
-					arp_firstDate[m]	= systime()
-					arp_inter[m] 		= m
-					arp_ip[m]		= "NA"
-					arp_bw[m "/in"]		= arp_bw[m "/out"] = 0
-				}
+	if (mode == "diff" || mode == "noUpdate") print n, $2
+	if (mode != "noUpdate") {
+		if (inInterfaces(m)) { # if label is an interface
+			if (!(m in arp_mac)) {
+				cmd = "cat /sys/class/net/" m "/address"
+				cmd | getline arp_mac[m]
+				close(cmd)
+				arp_ip[m]		= "NA"
+				arp_inter[m] 		= m
+				arp_bw[m "/in"]		= arp_bw[m "/out"] = 0
+				arp_firstDate[m]	= systime()
+				arp_lastDate[m]		= ""
 			}
+		} else {
+			if (!(m in arp_mac)) hosts[m] = 0
+			else delete hosts[m]
+		}
 
-			if ($2 > 0) { # counted some bytes
-				arp_bw[n]	= $2
-				arp_lastDate[m]	= systime()
-			}
+		if ($2 > 0) {
+			arp_bw[n]	= $2
+			arp_lastDate[m]	= systime()
 		}
 	}
 }
@@ -178,38 +159,45 @@ fid==3 && rrd { # iptables input
 END {
 	if (mode == "noUpdate") exit
 
-	for (ii in arp_ip) {
-		lb = arp_mac[ii]
+	flag = 0
+	for (i in arp_ip) {
+		if (arp_lastDate[i] != "") {
+			if (!flag) flag = 1
 
-		if (lb in mac) {
-			if (arp_lastDate[ii] != "") {
-				bw[lb "/in"]	+= arp_bw[ii "/in"]
-				bw[lb "/out"]	+= arp_bw[ii "/out"]
-				lastDate[lb]	= arp_lastDate[ii]
+			lb = arp_mac[i]
+
+			if (lb in mac) {
+				bw[lb "/in"]	+= arp_bw[i "/in"]
+				bw[lb "/out"]	+= arp_bw[i "/out"]
+				lastDate[lb]	= arp_lastDate[i]
+			} else {
+				speed[lb "/in"]	= speed[lb "/out"] = 0
+				bw[lb "/in"]	= arp_bw[i "/in"]
+				bw[lb "/out"]	= arp_bw[i "/out"]
+				firstDate[lb]	= lastDate[lb] = arp_firstDate[i]
 			}
-		} else {
-			speed[lb "/in"]	= speed[lb "/out"] = 0
-			bw[lb "/in"]	= arp_bw[ii "/in"]
-			bw[lb "/out"]	= arp_bw[ii "/out"]
-			firstDate[lb]	= lastDate[lb] = arp_firstDate[ii]
-		}
-		mac[lb]		= arp_mac[ii]
-		ip[lb]		= arp_ip[ii]
-		inter[lb]	= arp_inter[ii]
+			mac[lb]		= arp_mac[i]
+			ip[lb]		= arp_ip[i]
+			inter[lb]	= arp_inter[i]
 
-		if (interval != 0 && arp_lastDate[ii] != "") {
-			speed[lb "/in"]	= int(arp_bw[ii "/in"] / interval)
-			speed[lb "/out"]= int(arp_bw[ii "/out"] / interval)
+			if (interval != 0) {
+				speed[lb "/in"]	= int(arp_bw[i "/in"] / interval)
+				speed[lb "/out"]= int(arp_bw[i "/out"] / interval)
+			}
 		}
 	}
 
 	close(dbFile)
-	print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
-	OFS=","
+	if (flag) {
+		print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
+		OFS=","
 
-	for (i in mac)
-		print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
-	close(dbFile)
+		for (i in mac)
+			print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+		close(dbFile)
+	}
 	# for hosts without rules
-	for (host in hosts) if (!inInterfaces(host)) newRule(host)
+	for (i in hosts)
+		if (hosts[i]) newRule(i)
+		else delRule(i)
 }

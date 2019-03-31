@@ -5,13 +5,15 @@ START=99
 USE_PROCD=1
 
 NAME=wrtbwmon
+PID_FILE=/var/run/wrtbwmon.pid
 args=/usr/sbin/wrtbwmon
 
-create_instance(){
+create_instance() {
 	procd_open_instance
 	procd_set_param command $args
 	procd_set_param respawn
 	procd_set_param user root
+#	procd_set_param pidfile $PID_FILE
 	procd_close_instance
 }
 
@@ -34,5 +36,10 @@ start_service() {
 
 	config_get enabled  general enabled
 	[ "$enabled"0 -eq 0 ] || create_instance
+}
+
+stop_service() {
+	procd_kill wrtbwmon
+	kill -CONT $(cat $PID_FILE)
 }
 

@@ -29,7 +29,7 @@ nslookup=`which nslookup 2>/dev/null`
 nvram=`which nvram 2>/dev/null`
 
 chains='INPUT OUTPUT FORWARD'
-interfaces='eth0 tun0' # in addition to detected WAN
+interfaces='eth0 tun0 br-lan' # in addition to detected WAN
 
 # DNS server for reverse lookups provided in "DNS".
 # don't perform reverse DNS lookups by default
@@ -185,14 +185,12 @@ newRuleIF() {
 	local ipt=$3
 	local cmd=
 
-	#!@todo test
 	if [ "$chain" = "OUTPUT" ]; then
 		cmd="$ipt -t mangle -o $IF -j RETURN"
-		eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
 	elif [ "$chain" = "INPUT" ]; then
 		cmd="$ipt -t mangle -i $IF -j RETURN"
-		eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
 	fi
+	[ -n "$cmd" ] && eval $cmd " -C RRDIPT_$chain 2>/dev/null" || eval $cmd " -A RRDIPT_$chain"
 }
 
 publish() {
@@ -270,7 +268,7 @@ update() {
 			# track local data
 			for chain in INPUT OUTPUT; do
 				for interface in $interfaces; do
-				[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface $ii
+					[ -n "$interface" ] && [ -e "/sys/class/net/$interface" ] && newRuleIF $chain $interface $ii
 				done
 			done
 		fi
