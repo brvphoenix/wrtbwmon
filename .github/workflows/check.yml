@@ -1,0 +1,46 @@
+name: Check
+
+on:
+  push:
+    branches:
+    - new-dev
+    tags-ignore:
+    - 'v*'
+  pull_request:
+    branches:
+    - new-dev
+
+jobs:
+  build:
+    name: Build the IPK
+    runs-on: ubuntu-18.04
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+    - name: Docker Build
+      run: |
+        mkdir bin
+        cp -rf ./wrtbwmon ./bin/
+        docker pull openwrtorg/sdk:x86-64-19.07-SNAPSHOT
+        docker run --rm --name=test -u root -v "$(pwd)"/bin/:/home/build/openwrt/bin --privileged=true -d openwrtorg/sdk:x86-64-19.07-SNAPSHOT sleep 1d
+        docker exec -i test mv ./bin/wrtbwmon ./package/
+        docker exec -i test make defconfig
+        docker exec -i test make package/wrtbwmon/compile V=s -j$(nproc) | tee >./bin/build.log
+        docker stop test
+    - name: Pack Files
+      run: |
+        cd bin && tar -cJvf ../build.log.tar.xz build.log && cd ..
+        mkdir release
+        cp -f ./bin/packages/x86_64/base/wrtbwmon* ./release/
+        echo "::set-env name=app_path::$(ls ./release/wrtbwmon*)"
+    - name: Upload app
+      uses: actions/upload-artifact@v1
+      with:
+        name: app
+        path: ${{ env.app_path }}
+    - name: Upload Log
+      uses: actions/upload-artifact@v1
+      with:
+        name: buildlog
+        path: ./build.log.tar.xz
+
