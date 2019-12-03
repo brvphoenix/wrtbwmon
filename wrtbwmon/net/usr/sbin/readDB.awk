@@ -56,6 +56,7 @@ ARGIND==1 { #!@todo this doesn't help if the DB file is empty.
 		bw[lb "/out"]	= $7
 		firstDate[lb]	= $9
 		lastDate[lb]	= $10
+		ignore[lb]	= 1
 	} else {
 		if ($9 < firstDate[lb])
 			firstDate[lb]	= $9
@@ -66,6 +67,7 @@ ARGIND==1 { #!@todo this doesn't help if the DB file is empty.
 		}
 		bw[lb "/in"]	+= $6
 		bw[lb "/out"]	+= $7
+		ignore[lb]	= 0
 	}
 	next
 }
@@ -99,6 +101,7 @@ ARGIND==2 {
 		arp_bw[lb "/out"]	= 0
 		arp_firstDate[lb]	= systime()
 		arp_lastDate[lb]	= ""
+		arp_ignore[lb]		= 1
 	}
 	next
 }
@@ -152,6 +155,7 @@ ARGIND==3 && NF==iptNF && $1!="pkts" { # iptables input
 		if ($2 > 0) {
 			arp_bw[n]	= $2
 			arp_lastDate[m]	= systime()
+			arp_ignore[m]	= 0
 		}
 	}
 }
@@ -159,12 +163,10 @@ ARGIND==3 && NF==iptNF && $1!="pkts" { # iptables input
 END {
 	if (mode == "noUpdate") exit
 
-	flag = 0
 	for (i in arp_ip) {
-		if (arp_lastDate[i] != "") {
-			if (!flag) flag = 1
-
-			lb = arp_mac[i]
+		if (!arp_ignore[i]) {
+			lb 		= arp_mac[i]
+			ignore[lb]	= 0
 
 			if (lb in mac) {
 				bw[lb "/in"]	+= arp_bw[i "/in"]
@@ -188,14 +190,17 @@ END {
 	}
 
 	close(dbFile)
-	if (flag) {
-		print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
-		OFS=","
-
-		for (i in mac)
-			print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
-		close(dbFile)
+	for (i in mac) {
+		if (!ignore[i]) {
+			print "#mac,ip,iface,speed_in,speed_out,in,out,total,first_date,last_date" > dbFile
+			OFS=","
+			for (i in mac)
+				print mac[i], ip[i], inter[i], speed[i "/in"], speed[i "/out"], bw[i "/in"], bw[i "/out"], total(i), firstDate[i], lastDate[i] > dbFile
+			close(dbFile)
+			break
+		}
 	}
+
 	# for hosts without rules
 	for (i in hosts)
 		if (hosts[i]) newRule(i)
