@@ -100,7 +100,7 @@ ARGIND==2 {
 		arp_bw[lb "/in"]	= 0
 		arp_bw[lb "/out"]	= 0
 		arp_firstDate[lb]	= systime()
-		arp_lastDate[lb]	= ""
+		arp_lastDate[lb]	= arp_firstDate[lb]
 		arp_ignore[lb]		= 1
 	}
 	next
@@ -141,11 +141,16 @@ ARGIND==3 && NF==iptNF && $1!="pkts" { # iptables input
 				cmd = "cat /sys/class/net/" m "/address"
 				cmd | getline arp_mac[m]
 				close(cmd)
+
+				if (length(arp_mac[m]) == 0) arp_mac[m] = "00:00:00:00:00:00"
+
 				arp_ip[m]		= "NA"
 				arp_inter[m] 		= m
-				arp_bw[m "/in"]		= arp_bw[m "/out"] = 0
+				arp_bw[m "/in"]		= 0
+				arp_bw[m "/out"]	= 0
 				arp_firstDate[m]	= systime()
-				arp_lastDate[m]		= ""
+				arp_lastDate[m]		= arp_firstDate[m]
+				arp_ignore[lb]		= 1
 			}
 		} else {
 			if (!(m in arp_mac)) hosts[m] = 0
@@ -164,8 +169,8 @@ END {
 	if (mode == "noUpdate") exit
 
 	for (i in arp_ip) {
-		if (!arp_ignore[i]) {
-			lb 		= arp_mac[i]
+		lb = arp_mac[i]
+		if (!arp_ignore[i] || !(lb in mac)) {
 			ignore[lb]	= 0
 
 			if (lb in mac) {
@@ -173,10 +178,10 @@ END {
 				bw[lb "/out"]	+= arp_bw[i "/out"]
 				lastDate[lb]	= arp_lastDate[i]
 			} else {
-				speed[lb "/in"]	= speed[lb "/out"] = 0
 				bw[lb "/in"]	= arp_bw[i "/in"]
 				bw[lb "/out"]	= arp_bw[i "/out"]
-				firstDate[lb]	= lastDate[lb] = arp_firstDate[i]
+				firstDate[lb]	= arp_firstDate[i]
+				lastDate[lb]	= arp_lastDate[i]
 			}
 			mac[lb]		= arp_mac[i]
 			ip[lb]		= arp_ip[i]
