@@ -37,17 +37,14 @@ define Build/Compile
 endef
 
 define Package/wrtbwmon/install
-	$(INSTALL_DIR) $(1)/usr/sbin
+	$(INSTALL_DIR) $(1)/usr/sbin $(1)/usr/share/wrtbwmon
 	$(INSTALL_BIN) ./net/usr/sbin/* $(1)/usr/sbin/
-	
-	$(INSTALL_DIR) $(1)/usr/share/wrtbwmon
 	$(INSTALL_BIN) ./net/usr/share/wrtbwmon/* $(1)/usr/share/wrtbwmon/
 
-	$(INSTALL_DIR) $(1)/etc/init.d
+	$(INSTALL_DIR) $(1)/etc/config $(1)/etc/init.d $(1)/etc/hotplug.d/iface
 	$(INSTALL_BIN) ./net/etc/init.d/wrtbwmon $(1)/etc/init.d/wrtbwmon
-
-	$(INSTALL_DIR) $(1)/etc/config
 	$(INSTALL_BIN) ./net/etc/config/wrtbwmon $(1)/etc/config/wrtbwmon
+	$(INSTALL_BIN) ./net/etc/hotplug.d/iface/99-wrtbwmon $(1)/etc/hotplug.d/iface/99-wrtbwmon
 endef
 
 $(eval $(call BuildPackage,wrtbwmon))
