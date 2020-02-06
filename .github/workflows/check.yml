@@ -2,8 +2,7 @@ name: Check
 
 on:
   push:
-    tags-ignore:
-    - 'v*'
+
   pull_request:
 
 jobs:
