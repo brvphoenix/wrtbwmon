@@ -8,17 +8,17 @@
 include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wrtbwmon
-PKG_VERSION:=1.1.1
-PKG_RELEASE:=3
+PKG_VERSION:=1.2.0
+PKG_RELEASE:=1
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/wrtbwmon
 	SECTION:=net
 	CATEGORY:=Network
-	DEPENDS:=+busybox +iptables +ip
-	TITLE:=An Traffic Usage Monitor
-	SUBMENU:=CERNET
+	DEPENDS:=+busybox +iptables @!BUSYBOX_DEFAULT_IP:ip-full
+	TITLE:=A Traffic Usage Monitor
+	SUBMENU:=Tools
 	PKGARCH:=all
 endef
 
