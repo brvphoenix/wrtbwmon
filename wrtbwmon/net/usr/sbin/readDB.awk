@@ -92,7 +92,7 @@ ARGIND==2 {
 	}
 
 	lb=$1
-	if (hwIF != wanIF && lb ~ "^" ipReg && statFlag && macAddr ~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") {
+	if (hwIF != wanIF && statFlag && macAddr ~ "^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$") {
 		hosts[lb]		= 1
 		arp_mac[lb]		= macAddr
 		arp_ip[lb]		= $1
