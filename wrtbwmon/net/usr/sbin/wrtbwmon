@@ -333,7 +333,7 @@ ending() {
 checkPid() {
 	[ -e "$1" ] && local pid=$(cat $1) || return 1
 	[ -d "/proc/$pid" ] && {
-		[ -n $(echo $(cat "/proc/$pid/cmdline") | grep wrtbwmon ) ]  && return 0
+		[ -n "$( cat /proc/$pid/cmdline | grep wrtbwmon )" ] && return 0
 	}
 	return 1
 }
@@ -352,7 +352,7 @@ loop() {
 		local SPID=
 		echo $loopPID > $pidFile
 		while true ;do
-			[ -n $SPID ] && kill -9 $SPID >>/dev/null 2>&1
+			[ -n "$SPID" ] && kill -9 $SPID >>/dev/null 2>&1
 			sleepProcess $loopPID &
 			SPID=$!
 			updatePrepare && update
