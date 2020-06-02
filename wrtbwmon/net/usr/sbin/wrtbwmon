@@ -394,6 +394,7 @@ while [ $# != 0 ];do
 				DB=$1
 				DB6="$(renamefile $DB .6)"
 				DB46="$(renamefile $DB .46)"
+				DBHOSTS="$(renamefile $DB .hosts)"
 			else
 				echo "No db file path seted, exit!!"
 				exit 1
@@ -457,4 +458,6 @@ elif [ "$runMode" = '2' ]; then
 	loop >>/dev/null 2>&1 &
 else
 	updatePrepare && update
+	grep -E "([0-9a-f]{2}:){5}[0-9a-f]{2} ([0-9]{1,3}.){3}[0-9]{1,3} ([a-zA-Z0-9\-]{1,63})" /tmp/dhcp.leases -o | sed 's/ .* /,/g' > $DBHOSTS;
+	chmod 644 $DBHOSTS;
 fi
