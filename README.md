@@ -12,4 +12,4 @@ Compared with the original one, this version has made some changes:
 4. Many other details.
 
 # Download
-[v1.2.1](https://github.com/brvphoenix/wrtbwmon/releases/download/v1.2.1/wrtbwmon_1.2.1-1_all.ipk)
+[v1.2.1](https://github.com/brvphoenix/wrtbwmon/releases/download/v1.2.1-2/wrtbwmon_1.2.1-2_all.ipk)
