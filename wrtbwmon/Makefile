@@ -9,14 +9,14 @@ include $(TOPDIR)/rules.mk
 
 PKG_NAME:=wrtbwmon
 PKG_VERSION:=1.2.1
-PKG_RELEASE:=1
+PKG_RELEASE:=2
 
 include $(INCLUDE_DIR)/package.mk
 
 define Package/wrtbwmon
 	SECTION:=net
 	CATEGORY:=Network
-	DEPENDS:=+busybox +iptables +!BUSYBOX_DEFAULT_IP:ip-full
+	DEPENDS:=+iptables +!BUSYBOX_CONFIG_IP:ip-full
 	TITLE:=A Traffic Usage Monitor
 	SUBMENU:=Tools
 	PKGARCH:=all
