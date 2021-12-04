@@ -8,6 +8,13 @@ NAME=wrtbwmon
 PID_FILE=/var/run/wrtbwmon.pid
 args=/usr/sbin/wrtbwmon
 
+_renamefile() {
+	local base=$(basename -- "$1")
+	local ext=$([ -z "${base/*.*/}"  ] && echo ".${base##*.}" || echo '')
+	local base="${base%.*}"
+	echo "$(dirname $1)/${base}$2$ext" && return
+}
+
 create_instance() {
 	procd_open_instance
 	procd_set_param command $args
@@ -41,4 +48,25 @@ start_service() {
 stop_service() {
 	procd_kill wrtbwmon
 	kill -CONT $(cat $PID_FILE)
+}
+
+reload_service() {
+	if running; then
+		. /usr/share/libubox/jshn.sh
+		json_init
+		json_load "$(ubus call service list '{"name":"wrtbwmon"}' | jsonfilter -e @.*.*.*)"
+		export -n command
+		json_select command
+		json_get_values command
+		local oldPath="$(echo $command | sed -n 's/.*\-f \(\S\+\).*/\1/gp')"
+		local newPath=$(uci -q get wrtbwmon.general.path)
+		[ "$oldPath" = "${newPath:-/tmp/usage.db}" ] || {
+			mv "$oldPath" "${newPath:-/tmp/usage.db}"
+			mv "$(_renamefile $oldPath .6)" "$(_renamefile ${newPath:-/tmp/usage.db} .6)"
+			mv "$(_renamefile $oldPath .46)" "$(_renamefile ${newPath:-/tmp/usage.db} .46)"
+		}
+		json_cleanup
+	fi
+	stop
+	start
 }
